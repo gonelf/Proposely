@@ -1,13 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import BusinessInfoForm from "./components/BusinessInfoForm";
-import ClientInfoForm from "./components/ClientInfoForm";
-import LineItems from "./components/LineItems";
-import ProposalMeta from "./components/ProposalMeta";
-import NotesTerms from "./components/NotesTerms";
+import ProposalEditor from "./components/ProposalEditor";
 import ProposalPreview from "./components/ProposalPreview";
-import { BusinessInfo, ClientInfo, LineItem, ProposalData } from "./types/proposal";
+import { ProposalData } from "./types/proposal";
 
 const today = new Date().toISOString().split("T")[0];
 const validUntil = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
@@ -112,7 +108,7 @@ export default function Home() {
                     activeTab === "preview" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500"
                   }`}
                 >
-                  Preview
+                  PDF Preview
                 </button>
               </div>
 
@@ -148,51 +144,17 @@ export default function Home() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         <div className="flex gap-6">
           {/* Editor column */}
-          <div className={`flex-1 min-w-0 space-y-4 ${activeTab === "preview" ? "hidden lg:block" : ""}`}>
-            <ProposalMeta
-              data={{
-                proposalNumber: proposal.proposalNumber,
-                proposalDate: proposal.proposalDate,
-                validUntil: proposal.validUntil,
-                currency: proposal.currency,
-                currencySymbol: proposal.currencySymbol,
-                taxRate: proposal.taxRate,
-              }}
-              onChange={updateProposal}
-            />
-
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-              <BusinessInfoForm
-                data={proposal.businessInfo}
-                onChange={(businessInfo: BusinessInfo) => updateProposal({ businessInfo })}
-              />
-              <ClientInfoForm
-                data={proposal.clientInfo}
-                onChange={(clientInfo: ClientInfo) => updateProposal({ clientInfo })}
-              />
-            </div>
-
-            <LineItems
-              items={proposal.lineItems}
-              currencySymbol={proposal.currencySymbol}
-              onChange={(lineItems: LineItem[]) => updateProposal({ lineItems })}
-            />
-
-            <NotesTerms
-              notes={proposal.notes}
-              terms={proposal.terms}
-              onNotesChange={(notes) => updateProposal({ notes })}
-              onTermsChange={(terms) => updateProposal({ terms })}
-            />
+          <div className={`flex-1 min-w-0 ${activeTab === "preview" ? "hidden lg:block" : ""}`}>
+            <ProposalEditor data={proposal} onChange={updateProposal} />
           </div>
 
           {/* Preview column */}
           <div className={`w-full lg:w-[420px] xl:w-[480px] shrink-0 ${activeTab === "editor" ? "hidden lg:block" : ""}`}>
             <div className="sticky top-20">
               <div className="flex items-center justify-between mb-3">
-                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Live Preview</p>
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">PDF Preview</p>
                 <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded">
-                  Updates as you type
+                  Read-only
                 </span>
               </div>
               <ProposalPreview data={proposal} />
