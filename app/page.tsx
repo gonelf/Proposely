@@ -2,10 +2,10 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useAuth, useClient } from "@picobase_app/react";
 import ProposalEditor from "./components/ProposalEditor";
 import ProposalPreview from "./components/ProposalPreview";
-import LoadCompanyModal from "./components/LoadCompanyModal";
 import LoadProposalModal from "./components/LoadProposalModal";
 import LoadClientModal from "./components/LoadClientModal";
 import { ProposalData } from "./types/proposal";
@@ -51,6 +51,7 @@ type Tab = "editor" | "preview";
 export default function Home() {
   const { user, signOut } = useAuth();
   const client = useClient();
+  const router = useRouter();
   const [proposal, setProposal] = useState<ProposalData>(defaultProposal);
   const [activeTab, setActiveTab] = useState<Tab>("editor");
   const [isGenerating, setIsGenerating] = useState(false);
@@ -58,44 +59,107 @@ export default function Home() {
   const [isSavingCompany, setIsSavingCompany] = useState(false);
   const [isSavingClient, setIsSavingClient] = useState(false);
   const [proposalId, setProposalId] = useState<string | null>(null);
-  const [isLoadCompanyModalOpen, setIsLoadCompanyModalOpen] = useState(false);
   const [isLoadClientModalOpen, setIsLoadClientModalOpen] = useState(false);
   const [isLoadProposalModalOpen, setIsLoadProposalModalOpen] = useState(false);
+  const [hasSubscription, setHasSubscription] = useState<boolean | null>(null);
+  const [isCheckingSub, setIsCheckingSub] = useState(true);
 
   useEffect(() => {
     if (user) {
-      client.collection("proposals").getList(1, 1, {
-        sort: "-created",
-        filter: `user = "${user.id}"`,
-      }).then((result) => {
-        if (result.items.length > 0) {
-          const item = result.items[0];
-          setProposal({
-            proposalNumber: item.proposalNumber,
-            proposalDate: item.proposalDate,
-            validUntil: item.validUntil,
-            currency: item.currency,
-            currencySymbol: item.currencySymbol,
-            businessInfo: typeof item.businessInfo === 'string' ? JSON.parse(item.businessInfo) : item.businessInfo,
-            clientInfo: typeof item.clientInfo === 'string' ? JSON.parse(item.clientInfo) : item.clientInfo,
-            lineItems: typeof item.lineItems === 'string' ? JSON.parse(item.lineItems) : item.lineItems,
-            taxRate: item.taxRate,
-            notes: item.notes,
-            terms: item.terms,
+      setIsCheckingSub(true);
+      client.collection("subscriptions").getList(1, 1, {
+        filter: `user="${user.id}" && status="active"`,
+      }).then((subResult) => {
+        if (subResult.items && subResult.items.length > 0) {
+          setHasSubscription(true);
+          Promise.all([
+            client.collection("proposals").getList(1, 1, {
+              sort: "-created",
+              filter: `user = "${user.id}"`,
+            }),
+            client.collection("companies").getList(1, 1, {
+              filter: `user = "${user.id}"`,
+            })
+          ]).then(([propResult, compResult]) => {
+            let loadedCompany = null;
+            if (compResult.items.length > 0) {
+              const comp = compResult.items[0];
+              loadedCompany = {
+                name: comp.name || "",
+                email: comp.email || "",
+                phone: comp.phone || "",
+                address: comp.address || "",
+                city: comp.city || "",
+                country: comp.country || "",
+                logo: comp.logo || null,
+              };
+            }
+
+            if (propResult.items.length > 0) {
+              const item = propResult.items[0];
+              setProposal({
+                proposalNumber: item.proposalNumber,
+                proposalDate: item.proposalDate,
+                validUntil: item.validUntil,
+                currency: item.currency,
+                currencySymbol: item.currencySymbol,
+                businessInfo: loadedCompany || (typeof item.businessInfo === 'string' ? JSON.parse(item.businessInfo) : item.businessInfo),
+                clientInfo: typeof item.clientInfo === 'string' ? JSON.parse(item.clientInfo) : item.clientInfo,
+                lineItems: typeof item.lineItems === 'string' ? JSON.parse(item.lineItems) : item.lineItems,
+                taxRate: item.taxRate,
+                notes: item.notes,
+                terms: item.terms,
+              });
+              setProposalId(item.id);
+            } else if (loadedCompany) {
+              setProposal(prev => ({ ...prev, businessInfo: { ...prev.businessInfo, ...loadedCompany } }));
+            }
+          }).catch((err) => {
+            console.error("Error loading data:", err);
           });
-          setProposalId(item.id);
+        } else {
+          setHasSubscription(false);
         }
       }).catch((err) => {
-        console.error("Error loading proposal:", err);
+        console.error("Error checking subscription:", err);
+        setHasSubscription(false);
+      }).finally(() => {
+        setIsCheckingSub(false);
       });
     } else {
+      setHasSubscription(null);
+      setIsCheckingSub(false);
       setProposal(defaultProposal);
       setProposalId(null);
     }
-  }, [user, client]);
+  }, [user, client, router]);
+
+  const handleCheckout = async () => {
+    if (!user) return;
+    try {
+      const res = await fetch("/api/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: user.id, userEmail: user.email })
+      });
+      const data = await res.json();
+      if (data.url) {
+        window.location.href = data.url;
+      } else {
+        alert("Failed to create checkout session");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Something went wrong");
+    }
+  };
 
   const handleSave = async () => {
     if (!user) return alert("Please sign in to save your proposal.");
+    if (hasSubscription === false) {
+      alert("Please upgrade to Pro to save proposals.");
+      return;
+    }
     setIsSaving(true);
     try {
       const data = {
@@ -125,11 +189,15 @@ export default function Home() {
 
   const handleSaveCompany = async () => {
     if (!user) return alert("Please sign in to save company info.");
+    if (hasSubscription === false) {
+      alert("Please upgrade to Pro to save companies.");
+      return;
+    }
     if (!proposal.businessInfo.name) return alert("Company name is required to save.");
     setIsSavingCompany(true);
     try {
       const records = await client.collection("companies").getList(1, 1, {
-        filter: `user = "${user.id}" && name = "${proposal.businessInfo.name}"`,
+        filter: `user = "${user.id}"`,
       });
 
       const payload = {
@@ -161,6 +229,10 @@ export default function Home() {
 
   const handleSaveClient = async () => {
     if (!user) return alert("Please sign in to save client info.");
+    if (hasSubscription === false) {
+      alert("Please upgrade to Pro to save clients.");
+      return;
+    }
     if (!proposal.clientInfo.name) return alert("Client name is required to save.");
     setIsSavingClient(true);
     try {
@@ -194,6 +266,10 @@ export default function Home() {
   };
 
   const handleDownloadPdf = async () => {
+    if (hasSubscription === false) {
+      alert("Please upgrade to Pro to download high-quality PDFs.");
+      return;
+    }
     setIsGenerating(true);
     try {
       const { generateProposalPdf } = await import("./utils/generatePdf");
@@ -212,6 +288,15 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {isCheckingSub && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-50/80 backdrop-blur-sm">
+          <svg className="w-8 h-8 animate-spin text-blue-600" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+          </svg>
+        </div>
+      )}
+
       {/* Top bar */}
       <header className="bg-white border-b border-gray-200 sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -241,6 +326,18 @@ export default function Home() {
                     Sign In
                   </Link>
                 </div>
+              )}
+
+              {(!user || hasSubscription === false) && (
+                <button
+                  onClick={() => router.push("/checkout")}
+                  className="hidden sm:flex items-center gap-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-4 py-1.5 rounded-full text-sm font-semibold shadow-sm transition-all transform hover:scale-105"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                  Upgrade to Pro
+                </button>
               )}
 
               {/* Total pill */}
@@ -336,7 +433,6 @@ export default function Home() {
               onChange={updateProposal}
               isSavingCompany={isSavingCompany}
               onSaveCompany={handleSaveCompany}
-              onLoadCompanyClick={() => setIsLoadCompanyModalOpen(true)}
               isSavingClient={isSavingClient}
               onSaveClient={handleSaveClient}
               onLoadClientClick={() => setIsLoadClientModalOpen(true)}
@@ -357,12 +453,6 @@ export default function Home() {
           </div>
         </div>
       </div>
-
-      <LoadCompanyModal
-        isOpen={isLoadCompanyModalOpen}
-        onClose={() => setIsLoadCompanyModalOpen(false)}
-        onSelect={(companyInfo) => updateProposal({ businessInfo: companyInfo })}
-      />
 
       <LoadClientModal
         isOpen={isLoadClientModalOpen}

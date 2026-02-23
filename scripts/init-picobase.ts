@@ -116,6 +116,33 @@ async function init() {
         } else {
             console.log("ℹ️ 'clients' collection already exists.");
         }
+
+        if (!existing.includes("subscriptions")) {
+            console.log("Creating 'subscriptions' collection...");
+            await pb.admin.createCollection({
+                name: "subscriptions",
+                type: "base",
+                schema: [
+                    { name: "stripeCustomerId", type: "text", required: true },
+                    { name: "stripeSubscriptionId", type: "text", required: true },
+                    { name: "status", type: "text", required: true },
+                    {
+                        name: "user",
+                        type: "relation",
+                        required: true,
+                        options: { collectionId: "_pb_users_auth_", maxSelect: 1 }
+                    }
+                ] as any,
+                listRule: "user = @request.auth.id",
+                viewRule: "user = @request.auth.id",
+                createRule: null, // Only admin can create
+                updateRule: null, // Only admin can update
+                deleteRule: null, // Only admin can delete
+            });
+            console.log("✅ 'subscriptions' collection created.");
+        } else {
+            console.log("ℹ️ 'subscriptions' collection already exists.");
+        }
     } catch (error: any) {
         console.error("❌ Failed to initialize collections:", error);
         if (error.response?.data?.schema) {

@@ -24,7 +24,6 @@ interface Props {
   data: ProposalData;
   onChange: (updates: Partial<ProposalData>) => void;
   onSaveCompany?: () => void;
-  onLoadCompanyClick?: () => void;
   isSavingCompany?: boolean;
   onSaveClient?: () => void;
   onLoadClientClick?: () => void;
@@ -130,7 +129,6 @@ export default function ProposalEditor({
   data,
   onChange,
   onSaveCompany,
-  onLoadCompanyClick,
   isSavingCompany,
   onSaveClient,
   onLoadClientClick,
@@ -221,13 +219,6 @@ export default function ProposalEditor({
                 className="px-2 py-1 bg-green-50 text-green-700 hover:bg-green-100 disabled:opacity-50 text-[11px] font-medium rounded border border-green-200 transition-colors flex items-center gap-1"
               >
                 {isSavingCompany ? "Saving..." : "Save Company"}
-              </button>
-              <button
-                type="button"
-                onClick={onLoadCompanyClick}
-                className="px-2 py-1 bg-blue-50 text-blue-700 hover:bg-blue-100 text-[11px] font-medium rounded border border-blue-200 transition-colors flex items-center gap-1"
-              >
-                Load Company
               </button>
             </div>
             {/* Logo */}

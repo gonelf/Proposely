@@ -1,19 +1,32 @@
 "use client";
 
-import { AuthForm, useAuth } from "@picobase_app/react";
+import { AuthForm, useAuth, useClient } from "@picobase_app/react";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import Link from "next/link";
 
 export default function LoginPage() {
     const { user, loading } = useAuth();
+    const client = useClient();
     const router = useRouter();
 
     useEffect(() => {
-        if (!loading && user) {
-            router.push("/");
-        }
-    }, [user, loading, router]);
+        const checkSubscription = async () => {
+            if (!loading && user) {
+                try {
+                    await client.collection("subscriptions").getList(1, 1, {
+                        filter: `user="${user.id}" && status="active"`
+                    });
+                    router.push("/");
+                } catch (err) {
+                    console.error("Error checking subscription:", err);
+                    router.push("/");
+                }
+            }
+        };
+
+        checkSubscription();
+    }, [user, loading, router, client]);
 
     return (
         <div className="min-h-screen flex flex-col items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
