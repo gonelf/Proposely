@@ -2,10 +2,33 @@
 
 import { useRef } from "react";
 import { CURRENCIES, ProposalData, BusinessInfo, ClientInfo, LineItem } from "../types/proposal";
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+  useSortable
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 
 interface Props {
   data: ProposalData;
   onChange: (updates: Partial<ProposalData>) => void;
+  onSaveCompany?: () => void;
+  onLoadCompanyClick?: () => void;
+  isSavingCompany?: boolean;
+  onSaveClient?: () => void;
+  onLoadClientClick?: () => void;
+  isSavingClient?: boolean;
 }
 
 function generateId() {
@@ -16,9 +39,119 @@ function generateId() {
 const field =
   "bg-transparent border-b border-transparent hover:border-gray-300 focus:border-blue-400 focus:outline-none transition-colors placeholder:text-gray-300";
 
-export default function ProposalEditor({ data, onChange }: Props) {
+function SortableRow({
+  item,
+  index,
+  sym,
+  updateItem,
+  removeItem,
+}: {
+  item: LineItem;
+  index: number;
+  sym: string;
+  updateItem: (id: string, key: keyof LineItem, value: string | number) => void;
+  removeItem: (id: string) => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: item.id });
+  const style = { transform: CSS.Transform.toString(transform), transition };
+
+  return (
+    <tr
+      ref={setNodeRef}
+      style={style}
+      className={`group ${index % 2 === 0 ? "bg-white" : "bg-gray-50"} ${isDragging ? "bg-blue-50 shadow-md relative z-10" : ""
+        }`}
+    >
+      <td className="px-2 py-1.5">
+        <div className="flex items-center gap-2">
+          <div
+            {...attributes}
+            {...listeners}
+            className="cursor-grab active:cursor-grabbing text-gray-300 hover:text-gray-500"
+          >
+            <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
+            </svg>
+          </div>
+          <input
+            type="text"
+            value={item.description}
+            onChange={(e) => updateItem(item.id, "description", e.target.value)}
+            placeholder="Item description"
+            className={`${field} text-gray-700 w-full`}
+          />
+        </div>
+      </td>
+      <td className="px-2 py-1.5">
+        <input
+          type="number"
+          min="0"
+          step="0.01"
+          value={item.quantity}
+          onChange={(e) => updateItem(item.id, "quantity", parseFloat(e.target.value) || 0)}
+          className={`${field} text-gray-600 text-right w-full`}
+        />
+      </td>
+      <td className="px-2 py-1.5">
+        <div className="flex items-center justify-end gap-0.5">
+          <span className="text-gray-400">{sym}</span>
+          <input
+            type="number"
+            min="0"
+            step="0.01"
+            value={item.unitPrice}
+            onChange={(e) => updateItem(item.id, "unitPrice", parseFloat(e.target.value) || 0)}
+            className={`${field} text-gray-600 text-right w-14`}
+          />
+        </div>
+      </td>
+      <td className="px-2 py-1.5">
+        <div className="flex items-center justify-end gap-1">
+          <span className="font-medium text-gray-800 whitespace-nowrap">
+            {sym}{item.total.toFixed(2)}
+          </span>
+          <button
+            onClick={() => removeItem(item.id)}
+            className="opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-700 transition-opacity ml-0.5 shrink-0"
+            title="Remove item"
+            type="button"
+          >
+            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+      </td>
+    </tr>
+  );
+}
+
+export default function ProposalEditor({
+  data,
+  onChange,
+  onSaveCompany,
+  onLoadCompanyClick,
+  isSavingCompany,
+  onSaveClient,
+  onLoadClientClick,
+  isSavingClient
+}: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const sym = data.currencySymbol;
+
+  const sensors = useSensors(
+    useSensor(PointerSensor),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (over && active.id !== over.id) {
+      const oldIndex = data.lineItems.findIndex((item) => item.id === active.id);
+      const newIndex = data.lineItems.findIndex((item) => item.id === over.id);
+      onChange({ lineItems: arrayMove(data.lineItems, oldIndex, newIndex) });
+    }
+  };
 
   const subtotal = data.lineItems.reduce((sum, item) => sum + item.total, 0);
   const taxAmount = subtotal * (data.taxRate / 100);
@@ -80,6 +213,23 @@ export default function ProposalEditor({ data, onChange }: Props) {
 
           {/* Left: logo + business contact */}
           <div className="flex-1 min-w-0">
+            <div className="mb-4 flex gap-2 items-center">
+              <button
+                type="button"
+                onClick={onSaveCompany}
+                disabled={isSavingCompany}
+                className="px-2 py-1 bg-green-50 text-green-700 hover:bg-green-100 disabled:opacity-50 text-[11px] font-medium rounded border border-green-200 transition-colors flex items-center gap-1"
+              >
+                {isSavingCompany ? "Saving..." : "Save Company"}
+              </button>
+              <button
+                type="button"
+                onClick={onLoadCompanyClick}
+                className="px-2 py-1 bg-blue-50 text-blue-700 hover:bg-blue-100 text-[11px] font-medium rounded border border-blue-200 transition-colors flex items-center gap-1"
+              >
+                Load Company
+              </button>
+            </div>
             {/* Logo */}
             <div className="mb-2">
               {data.businessInfo.logo ? (
@@ -233,7 +383,26 @@ export default function ProposalEditor({ data, onChange }: Props) {
 
       {/* ── Bill To ────────────────────────────────────────────── */}
       <div className="p-6 border-b border-gray-100">
-        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Bill To</p>
+        <div className="flex justify-between items-start mb-4">
+          <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">Bill To</p>
+          <div className="flex gap-2 items-center">
+            <button
+              type="button"
+              onClick={onSaveClient}
+              disabled={isSavingClient}
+              className="px-2 py-1 bg-green-50 text-green-700 hover:bg-green-100 disabled:opacity-50 text-[11px] font-medium rounded border border-green-200 transition-colors flex items-center gap-1"
+            >
+              {isSavingClient ? "Saving..." : "Save Client"}
+            </button>
+            <button
+              type="button"
+              onClick={onLoadClientClick}
+              className="px-2 py-1 bg-blue-50 text-blue-700 hover:bg-blue-100 text-[11px] font-medium rounded border border-blue-200 transition-colors flex items-center gap-1"
+            >
+              Load Client
+            </button>
+          </div>
+        </div>
 
         <input
           type="text"
@@ -283,93 +452,40 @@ export default function ProposalEditor({ data, onChange }: Props) {
 
       {/* ── Line Items ─────────────────────────────────────────── */}
       <div className="p-6">
-        <table className="w-full text-xs">
-          <thead>
-            <tr className="bg-blue-600 text-white">
-              <th className="text-left px-2 py-1.5 rounded-l font-semibold">Description</th>
-              <th className="text-right px-2 py-1.5 font-semibold w-12">Qty</th>
-              <th className="text-right px-2 py-1.5 font-semibold w-20">Unit Price</th>
-              <th className="text-right px-2 py-1.5 rounded-r font-semibold w-24">Total</th>
-            </tr>
-          </thead>
-          <tbody>
-            {data.lineItems.length === 0 ? (
-              <tr>
-                <td colSpan={4} className="text-center py-4 text-gray-300">
-                  No items yet
-                </td>
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="bg-blue-600 text-white">
+                <th className="text-left px-2 py-1.5 rounded-l font-semibold">Description</th>
+                <th className="text-right px-2 py-1.5 font-semibold w-12">Qty</th>
+                <th className="text-right px-2 py-1.5 font-semibold w-20">Unit Price</th>
+                <th className="text-right px-2 py-1.5 rounded-r font-semibold w-24">Total</th>
               </tr>
-            ) : (
-              data.lineItems.map((item, i) => (
-                <tr
-                  key={item.id}
-                  className={`group ${i % 2 === 0 ? "bg-white" : "bg-gray-50"}`}
-                >
-                  {/* Description */}
-                  <td className="px-2 py-1.5">
-                    <input
-                      type="text"
-                      value={item.description}
-                      onChange={(e) => updateItem(item.id, "description", e.target.value)}
-                      placeholder="Item description"
-                      className={`${field} text-gray-700 w-full`}
+            </thead>
+            <SortableContext items={data.lineItems.map(i => i.id)} strategy={verticalListSortingStrategy}>
+              <tbody>
+                {data.lineItems.length === 0 ? (
+                  <tr>
+                    <td colSpan={4} className="text-center py-4 text-gray-300">
+                      No items yet
+                    </td>
+                  </tr>
+                ) : (
+                  data.lineItems.map((item, i) => (
+                    <SortableRow
+                      key={item.id}
+                      item={item}
+                      index={i}
+                      sym={sym}
+                      updateItem={updateItem}
+                      removeItem={removeItem}
                     />
-                  </td>
-
-                  {/* Qty */}
-                  <td className="px-2 py-1.5">
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={item.quantity}
-                      onChange={(e) =>
-                        updateItem(item.id, "quantity", parseFloat(e.target.value) || 0)
-                      }
-                      className={`${field} text-gray-600 text-right w-full`}
-                    />
-                  </td>
-
-                  {/* Unit Price */}
-                  <td className="px-2 py-1.5">
-                    <div className="flex items-center justify-end gap-0.5">
-                      <span className="text-gray-400">{sym}</span>
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={item.unitPrice}
-                        onChange={(e) =>
-                          updateItem(item.id, "unitPrice", parseFloat(e.target.value) || 0)
-                        }
-                        className={`${field} text-gray-600 text-right w-14`}
-                      />
-                    </div>
-                  </td>
-
-                  {/* Total + delete */}
-                  <td className="px-2 py-1.5">
-                    <div className="flex items-center justify-end gap-1">
-                      <span className="font-medium text-gray-800">
-                        {sym}{item.total.toFixed(2)}
-                      </span>
-                      <button
-                        onClick={() => removeItem(item.id)}
-                        className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 transition-opacity ml-0.5 shrink-0"
-                        title="Remove item"
-                      >
-                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                            d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
+                  ))
+                )}
+              </tbody>
+            </SortableContext>
+          </table>
+        </DndContext>
 
         {/* Add item */}
         <button

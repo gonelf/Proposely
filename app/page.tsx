@@ -1,8 +1,13 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import Link from "next/link";
+import { useAuth, useClient } from "@picobase_app/react";
 import ProposalEditor from "./components/ProposalEditor";
 import ProposalPreview from "./components/ProposalPreview";
+import LoadCompanyModal from "./components/LoadCompanyModal";
+import LoadProposalModal from "./components/LoadProposalModal";
+import LoadClientModal from "./components/LoadClientModal";
 import { ProposalData } from "./types/proposal";
 
 const today = new Date().toISOString().split("T")[0];
@@ -44,12 +49,148 @@ const defaultProposal: ProposalData = {
 type Tab = "editor" | "preview";
 
 export default function Home() {
+  const { user, signOut } = useAuth();
+  const client = useClient();
   const [proposal, setProposal] = useState<ProposalData>(defaultProposal);
   const [activeTab, setActiveTab] = useState<Tab>("editor");
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isSavingCompany, setIsSavingCompany] = useState(false);
+  const [isSavingClient, setIsSavingClient] = useState(false);
+  const [proposalId, setProposalId] = useState<string | null>(null);
+  const [isLoadCompanyModalOpen, setIsLoadCompanyModalOpen] = useState(false);
+  const [isLoadClientModalOpen, setIsLoadClientModalOpen] = useState(false);
+  const [isLoadProposalModalOpen, setIsLoadProposalModalOpen] = useState(false);
+
+  useEffect(() => {
+    if (user) {
+      client.collection("proposals").getList(1, 1, {
+        sort: "-created",
+        filter: `user = "${user.id}"`,
+      }).then((result) => {
+        if (result.items.length > 0) {
+          const item = result.items[0];
+          setProposal({
+            proposalNumber: item.proposalNumber,
+            proposalDate: item.proposalDate,
+            validUntil: item.validUntil,
+            currency: item.currency,
+            currencySymbol: item.currencySymbol,
+            businessInfo: typeof item.businessInfo === 'string' ? JSON.parse(item.businessInfo) : item.businessInfo,
+            clientInfo: typeof item.clientInfo === 'string' ? JSON.parse(item.clientInfo) : item.clientInfo,
+            lineItems: typeof item.lineItems === 'string' ? JSON.parse(item.lineItems) : item.lineItems,
+            taxRate: item.taxRate,
+            notes: item.notes,
+            terms: item.terms,
+          });
+          setProposalId(item.id);
+        }
+      }).catch((err) => {
+        console.error("Error loading proposal:", err);
+      });
+    } else {
+      setProposal(defaultProposal);
+      setProposalId(null);
+    }
+  }, [user, client]);
+
+  const handleSave = async () => {
+    if (!user) return alert("Please sign in to save your proposal.");
+    setIsSaving(true);
+    try {
+      const data = {
+        ...proposal,
+        user: user.id
+      };
+
+      if (proposalId) {
+        await client.collection("proposals").update(proposalId, data);
+        alert("Proposal updated successfully!");
+      } else {
+        const record = await client.collection("proposals").create(data);
+        setProposalId(record.id);
+        alert("Proposal saved successfully!");
+      }
+    } catch (err) {
+      console.error("Failed to save proposal:", err);
+      alert("Failed to save proposal. Please try again.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   const updateProposal = (updates: Partial<ProposalData>) => {
     setProposal((prev) => ({ ...prev, ...updates }));
+  };
+
+  const handleSaveCompany = async () => {
+    if (!user) return alert("Please sign in to save company info.");
+    if (!proposal.businessInfo.name) return alert("Company name is required to save.");
+    setIsSavingCompany(true);
+    try {
+      const records = await client.collection("companies").getList(1, 1, {
+        filter: `user = "${user.id}" && name = "${proposal.businessInfo.name}"`,
+      });
+
+      const payload = {
+        name: proposal.businessInfo.name,
+        email: proposal.businessInfo.email,
+        phone: proposal.businessInfo.phone,
+        address: proposal.businessInfo.address,
+        city: proposal.businessInfo.city,
+        country: proposal.businessInfo.country,
+        logo: proposal.businessInfo.logo,
+        baseProposalId: parseInt(proposal.proposalNumber.replace(/\D/g, "") || "1", 10),
+        user: user.id,
+      };
+
+      if (records.items.length > 0) {
+        await client.collection("companies").update(records.items[0].id, payload);
+        alert("Company updated successfully!");
+      } else {
+        await client.collection("companies").create(payload);
+        alert("Company saved successfully!");
+      }
+    } catch (err) {
+      console.error("Failed to save company:", err);
+      alert("Failed to save company. Please try again.");
+    } finally {
+      setIsSavingCompany(false);
+    }
+  };
+
+  const handleSaveClient = async () => {
+    if (!user) return alert("Please sign in to save client info.");
+    if (!proposal.clientInfo.name) return alert("Client name is required to save.");
+    setIsSavingClient(true);
+    try {
+      const records = await client.collection("clients").getList(1, 1, {
+        filter: `user = "${user.id}" && name = "${proposal.clientInfo.name}"`,
+      });
+
+      const payload = {
+        name: proposal.clientInfo.name,
+        email: proposal.clientInfo.email,
+        phone: proposal.clientInfo.phone,
+        address: proposal.clientInfo.address,
+        city: proposal.clientInfo.city,
+        country: proposal.clientInfo.country,
+        user: user.id,
+      };
+
+      if (records.items.length > 0) {
+        await client.collection("clients").update(records.items[0].id, payload);
+        alert("Client updated successfully!");
+      } else {
+        await client.collection("clients").create(payload);
+        alert("Client saved successfully!");
+      }
+    } catch (err) {
+      console.error("Failed to save client:", err);
+      alert("Failed to save client. Please try again.");
+    } finally {
+      setIsSavingClient(false);
+    }
   };
 
   const handleDownloadPdf = async () => {
@@ -86,31 +227,76 @@ export default function Home() {
             </div>
 
             <div className="flex items-center gap-3">
+              {/* User auth state */}
+              {user ? (
+                <div className="hidden sm:flex items-center gap-3 mr-2 pr-4 border-r border-gray-200">
+                  <span className="text-sm text-gray-600 truncate max-w-[150px]" title={user.email}>{user.email}</span>
+                  <button onClick={signOut} className="text-sm font-medium text-gray-500 hover:text-gray-900 transition-colors">
+                    Sign Out
+                  </button>
+                </div>
+              ) : (
+                <div className="hidden sm:flex items-center gap-3 mr-2 pr-4 border-r border-gray-200">
+                  <Link href="/login" className="text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors">
+                    Sign In
+                  </Link>
+                </div>
+              )}
+
               {/* Total pill */}
               <div className="hidden sm:flex items-center gap-1.5 bg-blue-50 text-blue-700 px-3 py-1.5 rounded-full text-sm font-semibold">
                 <span className="text-xs text-blue-400">{proposal.currency}</span>
                 {proposal.currencySymbol}{total.toFixed(2)}
               </div>
 
-              {/* Mobile tab toggle */}
               <div className="flex lg:hidden bg-gray-100 rounded-lg p-0.5">
                 <button
                   onClick={() => setActiveTab("editor")}
-                  className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
-                    activeTab === "editor" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500"
-                  }`}
+                  className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${activeTab === "editor" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500"
+                    }`}
                 >
                   Edit
                 </button>
                 <button
                   onClick={() => setActiveTab("preview")}
-                  className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
-                    activeTab === "preview" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500"
-                  }`}
+                  className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${activeTab === "preview" ? "bg-white text-gray-900 shadow-sm" : "text-gray-500"
+                    }`}
                 >
                   PDF Preview
                 </button>
               </div>
+
+              {user && (
+                <button
+                  onClick={() => setIsLoadProposalModalOpen(true)}
+                  className="hidden md:flex items-center gap-2 text-gray-600 hover:text-gray-900 px-3 py-2 text-sm font-medium transition-colors"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4" />
+                  </svg>
+                  Proposals
+                </button>
+              )}
+
+              {user && (
+                <button
+                  onClick={handleSave}
+                  disabled={isSaving}
+                  className="hidden sm:flex items-center gap-2 bg-gray-100 hover:bg-gray-200 disabled:bg-gray-50 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                >
+                  {isSaving ? (
+                    <>
+                      <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                      </svg>
+                      Saving…
+                    </>
+                  ) : (
+                    "Save"
+                  )}
+                </button>
+              )}
 
               <button
                 onClick={handleDownloadPdf}
@@ -145,7 +331,16 @@ export default function Home() {
         <div className="flex gap-6">
           {/* Editor column */}
           <div className={`flex-1 min-w-0 ${activeTab === "preview" ? "hidden lg:block" : ""}`}>
-            <ProposalEditor data={proposal} onChange={updateProposal} />
+            <ProposalEditor
+              data={proposal}
+              onChange={updateProposal}
+              isSavingCompany={isSavingCompany}
+              onSaveCompany={handleSaveCompany}
+              onLoadCompanyClick={() => setIsLoadCompanyModalOpen(true)}
+              isSavingClient={isSavingClient}
+              onSaveClient={handleSaveClient}
+              onLoadClientClick={() => setIsLoadClientModalOpen(true)}
+            />
           </div>
 
           {/* Preview column */}
@@ -162,6 +357,27 @@ export default function Home() {
           </div>
         </div>
       </div>
+
+      <LoadCompanyModal
+        isOpen={isLoadCompanyModalOpen}
+        onClose={() => setIsLoadCompanyModalOpen(false)}
+        onSelect={(companyInfo) => updateProposal({ businessInfo: companyInfo })}
+      />
+
+      <LoadClientModal
+        isOpen={isLoadClientModalOpen}
+        onClose={() => setIsLoadClientModalOpen(false)}
+        onSelect={(clientInfo) => updateProposal({ clientInfo })}
+      />
+
+      <LoadProposalModal
+        isOpen={isLoadProposalModalOpen}
+        onClose={() => setIsLoadProposalModalOpen(false)}
+        onSelect={(id, data) => {
+          setProposal(data);
+          setProposalId(id);
+        }}
+      />
     </div>
   );
 }
