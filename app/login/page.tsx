@@ -50,11 +50,21 @@ export default function LoginPage() {
                 </div>
 
                 {!loading && !user && (
-                    <AuthForm
-                        onSuccess={() => {
-                            router.push("/");
-                        }}
-                    />
+                    <>
+                        <AuthForm
+                            mode="signIn"
+                            className="[&_form>div:last-child]:hidden"
+                            onSuccess={() => {
+                                router.push("/");
+                            }}
+                        />
+                        <div className="mt-4 text-center text-sm text-gray-600">
+                            Don't have an account?{" "}
+                            <Link href="/checkout" className="font-medium text-blue-600 hover:text-blue-500">
+                                Sign up
+                            </Link>
+                        </div>
+                    </>
                 )}
 
                 {loading && (
