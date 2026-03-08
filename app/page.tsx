@@ -8,6 +8,7 @@ import ProposalEditor from "./components/ProposalEditor";
 import ProposalPreview from "./components/ProposalPreview";
 import LoadProposalModal from "./components/LoadProposalModal";
 import LoadClientModal from "./components/LoadClientModal";
+import ShareProposalModal from "./components/ShareProposalModal";
 import { ProposalData } from "./types/proposal";
 
 const today = new Date().toISOString().split("T")[0];
@@ -61,6 +62,7 @@ export default function Home() {
   const [proposalId, setProposalId] = useState<string | null>(null);
   const [isLoadClientModalOpen, setIsLoadClientModalOpen] = useState(false);
   const [isLoadProposalModalOpen, setIsLoadProposalModalOpen] = useState(false);
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [hasSubscription, setHasSubscription] = useState<boolean | null>(null);
   const [isCheckingSub, setIsCheckingSub] = useState(true);
 
@@ -395,6 +397,18 @@ export default function Home() {
                 </button>
               )}
 
+              {user && hasSubscription && (
+                <button
+                  onClick={() => setIsShareModalOpen(true)}
+                  className="hidden sm:flex items-center gap-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                  </svg>
+                  Send to Client
+                </button>
+              )}
+
               <button
                 onClick={handleDownloadPdf}
                 disabled={isGenerating}
@@ -468,6 +482,18 @@ export default function Home() {
           setProposalId(id);
         }}
       />
+
+      {user && (
+        <ShareProposalModal
+          isOpen={isShareModalOpen}
+          onClose={() => setIsShareModalOpen(false)}
+          proposalId={proposalId}
+          userId={user.id}
+          clientEmail={proposal.clientInfo.email}
+          clientName={proposal.clientInfo.name}
+          proposalNumber={proposal.proposalNumber}
+        />
+      )}
     </div>
   );
 }
