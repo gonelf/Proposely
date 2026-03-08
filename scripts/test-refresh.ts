@@ -1,33 +1,26 @@
-import PocketBase from "pocketbase";
+import { createClient } from "@tacobase/client";
 
-const url = "https://proposely.picobase.app";
+const url = "https://proposely.tacobase.dev";
 
 async function run() {
-    // Standard PocketBase without X-PicoBase-Key header
-    const pb = new PocketBase(url);
+    const db = createClient(url, "tbk_example");
 
-    // Create a temp user
-    const email = `test_no_key_${Date.now()}@example.com`;
+    const email = `test_${Date.now()}@example.com`;
     const password = "password123";
 
-    console.log("Signing up without PicoBase key...");
+    console.log("Signing up...");
     try {
-        await pb.collection("users").create({
-            email,
-            password,
-            passwordConfirm: password
-        });
-        await pb.collection("users").authWithPassword(email, password);
-        console.log("Sign up & Auth successful!");
+        await db.auth.signUp({ email, password, passwordConfirm: password });
+        console.log("Sign up successful!");
 
-        console.log("Token before refresh:", pb.authStore.token ? "EXISTS" : "NULL");
+        console.log("Token before refresh:", db.token ? "EXISTS" : "NULL");
 
         console.log("Refreshing token...");
-        const result = await pb.collection("users").authRefresh();
+        const result = await db.auth.refreshToken();
         console.log("Refresh successful!", result.token ? "NEW_TOKEN_EXISTS" : "NO_NEW_TOKEN");
 
     } catch (e: any) {
-        console.error("Error occurred:", e.message, e.status, e.data);
+        console.error("Error occurred:", e.message);
     }
 }
 

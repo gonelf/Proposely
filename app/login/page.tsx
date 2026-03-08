@@ -1,6 +1,6 @@
 "use client";
 
-import { AuthForm, useAuth, useClient } from "@picobase_app/react";
+import { AuthForm, useAuth, useClient } from "@tacobase/react";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import Link from "next/link";

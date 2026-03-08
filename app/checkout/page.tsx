@@ -1,6 +1,6 @@
 "use client";
 
-import { useAuth, useClient } from "@picobase_app/react";
+import { useAuth, useClient } from "@tacobase/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { loadStripe } from "@stripe/stripe-js";
@@ -41,7 +41,7 @@ export default function CheckoutPage() {
                         }
 
                         userIdToPass = user.id;
-                        userEmailToPass = user.email;
+                        userEmailToPass = user.email as string;
                     }
 
                     const checkoutRes = await fetch("/api/checkout", {

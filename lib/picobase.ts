@@ -1,7 +1,7 @@
-import { createClient } from "@picobase_app/client";
+import { createClient } from "@tacobase/client";
 
-const url = process.env.NEXT_PUBLIC_PICOBASE_URL || "https://example.picobase.app";
-const apiKey = process.env.NEXT_PUBLIC_PICOBASE_API_KEY || "pbk_example";
+const url = process.env.NEXT_PUBLIC_TACOBASE_URL || "https://example.tacobase.dev";
+const apiKey = process.env.NEXT_PUBLIC_TACOBASE_API_KEY || "tbk_example";
 
 export const pb = createClient(url, apiKey);
 export default pb;

@@ -3,11 +3,12 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useAuth, useClient } from "@picobase_app/react";
+import { useAuth, useClient } from "@tacobase/react";
 import ProposalEditor from "./components/ProposalEditor";
 import ProposalPreview from "./components/ProposalPreview";
 import LoadProposalModal from "./components/LoadProposalModal";
 import LoadClientModal from "./components/LoadClientModal";
+import ShareProposalModal from "./components/ShareProposalModal";
 import { ProposalData } from "./types/proposal";
 
 const today = new Date().toISOString().split("T")[0];
@@ -61,6 +62,7 @@ export default function Home() {
   const [proposalId, setProposalId] = useState<string | null>(null);
   const [isLoadClientModalOpen, setIsLoadClientModalOpen] = useState(false);
   const [isLoadProposalModalOpen, setIsLoadProposalModalOpen] = useState(false);
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [hasSubscription, setHasSubscription] = useState<boolean | null>(null);
   const [isCheckingSub, setIsCheckingSub] = useState(true);
 
@@ -83,7 +85,7 @@ export default function Home() {
           ]).then(([propResult, compResult]) => {
             let loadedCompany = null;
             if (compResult.items.length > 0) {
-              const comp = compResult.items[0];
+              const comp = compResult.items[0] as Record<string, any>;
               loadedCompany = {
                 name: comp.name || "",
                 email: comp.email || "",
@@ -96,7 +98,7 @@ export default function Home() {
             }
 
             if (propResult.items.length > 0) {
-              const item = propResult.items[0];
+              const item = propResult.items[0] as Record<string, any>;
               setProposal({
                 proposalNumber: item.proposalNumber,
                 proposalDate: item.proposalDate,
@@ -266,10 +268,6 @@ export default function Home() {
   };
 
   const handleDownloadPdf = async () => {
-    if (hasSubscription === false) {
-      alert("Please upgrade to Pro to download high-quality PDFs.");
-      return;
-    }
     setIsGenerating(true);
     try {
       const { generateProposalPdf } = await import("./utils/generatePdf");
@@ -315,7 +313,7 @@ export default function Home() {
               {/* User auth state */}
               {user ? (
                 <div className="hidden sm:flex items-center gap-3 mr-2 pr-4 border-r border-gray-200">
-                  <span className="text-sm text-gray-600 truncate max-w-[150px]" title={user.email}>{user.email}</span>
+                  <span className="text-sm text-gray-600 truncate max-w-[150px]" title={user.email as string}>{user.email as string}</span>
                   <button onClick={signOut} className="text-sm font-medium text-gray-500 hover:text-gray-900 transition-colors">
                     Sign Out
                   </button>
@@ -396,6 +394,21 @@ export default function Home() {
               )}
 
               <button
+                onClick={user && hasSubscription ? () => setIsShareModalOpen(true) : () => router.push("/checkout")}
+                className="hidden sm:flex items-center gap-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-4 py-2 rounded-lg text-sm font-medium transition-colors"
+              >
+                {!(user && hasSubscription) && (
+                  <svg className="w-3.5 h-3.5 text-indigo-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                  </svg>
+                )}
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                </svg>
+                Send to Client
+              </button>
+
+              <button
                 onClick={handleDownloadPdf}
                 disabled={isGenerating}
                 className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors"
@@ -468,6 +481,18 @@ export default function Home() {
           setProposalId(id);
         }}
       />
+
+      {user && (
+        <ShareProposalModal
+          isOpen={isShareModalOpen}
+          onClose={() => setIsShareModalOpen(false)}
+          proposalId={proposalId}
+          userId={user.id}
+          clientEmail={proposal.clientInfo.email}
+          clientName={proposal.clientInfo.name}
+          proposalNumber={proposal.proposalNumber}
+        />
+      )}
     </div>
   );
 }
