@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useAuth, useClient } from "@picobase_app/react";
+import { useAuth, useClient } from "@tacobase/react";
 import ProposalEditor from "./components/ProposalEditor";
 import ProposalPreview from "./components/ProposalPreview";
 import LoadProposalModal from "./components/LoadProposalModal";
@@ -85,7 +85,7 @@ export default function Home() {
           ]).then(([propResult, compResult]) => {
             let loadedCompany = null;
             if (compResult.items.length > 0) {
-              const comp = compResult.items[0];
+              const comp = compResult.items[0] as Record<string, any>;
               loadedCompany = {
                 name: comp.name || "",
                 email: comp.email || "",
@@ -98,7 +98,7 @@ export default function Home() {
             }
 
             if (propResult.items.length > 0) {
-              const item = propResult.items[0];
+              const item = propResult.items[0] as Record<string, any>;
               setProposal({
                 proposalNumber: item.proposalNumber,
                 proposalDate: item.proposalDate,
@@ -313,7 +313,7 @@ export default function Home() {
               {/* User auth state */}
               {user ? (
                 <div className="hidden sm:flex items-center gap-3 mr-2 pr-4 border-r border-gray-200">
-                  <span className="text-sm text-gray-600 truncate max-w-[150px]" title={user.email}>{user.email}</span>
+                  <span className="text-sm text-gray-600 truncate max-w-[150px]" title={user.email as string}>{user.email as string}</span>
                   <button onClick={signOut} className="text-sm font-medium text-gray-500 hover:text-gray-900 transition-colors">
                     Sign Out
                   </button>

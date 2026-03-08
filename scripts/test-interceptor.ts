@@ -1,4 +1,4 @@
-import { createClient } from "@picobase_app/client";
+import { createClient } from "@tacobase/client";
 
 const customFetch = async (input: RequestInfo | URL, init?: RequestInit) => {
     console.log("INTERCEPTOR CALLED WITH:", input.toString());

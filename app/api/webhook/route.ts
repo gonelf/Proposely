@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import Stripe from "stripe";
-import { createClient } from "@picobase_app/client";
+import { createClient } from "@tacobase/client";
 
 export async function POST(req: Request) {
     if (!process.env.STRIPE_SECRET_KEY) {
@@ -9,8 +9,8 @@ export async function POST(req: Request) {
     const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
         apiVersion: "2025-01-27.acacia" as any,
     });
-    const pbUrl = process.env.NEXT_PUBLIC_PICOBASE_URL;
-    const adminKey = process.env.PICOBASE_ADMIN_API_KEY;
+    const pbUrl = process.env.NEXT_PUBLIC_TACOBASE_URL;
+    const adminKey = process.env.TACOBASE_ADMIN_API_KEY;
     if (!pbUrl || !adminKey) {
         return NextResponse.json({ error: "Missing database configuration" }, { status: 500 });
     }

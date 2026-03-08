@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useClient, useAuth } from "@picobase_app/react";
+import { useClient, useAuth } from "@tacobase/react";
 import { ProposalData } from "../types/proposal";
 
 interface Props {

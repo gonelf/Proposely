@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@picobase_app/client";
+import { createClient } from "@tacobase/client";
 
 function generateAccessCode(): string {
   return Math.floor(100000 + Math.random() * 900000).toString();
@@ -61,8 +61,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
     }
 
-    const pbUrl = process.env.NEXT_PUBLIC_PICOBASE_URL;
-    const adminKey = process.env.PICOBASE_ADMIN_API_KEY;
+    const pbUrl = process.env.NEXT_PUBLIC_TACOBASE_URL;
+    const adminKey = process.env.TACOBASE_ADMIN_API_KEY;
 
     if (!pbUrl || !adminKey) {
       return NextResponse.json({ error: "Missing database configuration" }, { status: 500 });
@@ -72,7 +72,7 @@ export async function POST(req: Request) {
 
     let proposal;
     try {
-      proposal = await pb.collection("proposals").getOne(proposalId);
+      proposal = await pb.collection("proposals").getOne(proposalId) as Record<string, any>;
     } catch {
       return NextResponse.json({ error: "Proposal not found" }, { status: 404 });
     }

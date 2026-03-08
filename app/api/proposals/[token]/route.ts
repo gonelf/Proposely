@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@picobase_app/client";
+import { createClient } from "@tacobase/client";
 
 export async function GET(
   _req: Request,
@@ -7,8 +7,8 @@ export async function GET(
 ) {
   const { token } = await params;
 
-  const pbUrl = process.env.NEXT_PUBLIC_PICOBASE_URL;
-  const adminKey = process.env.PICOBASE_ADMIN_API_KEY;
+  const pbUrl = process.env.NEXT_PUBLIC_TACOBASE_URL;
+  const adminKey = process.env.TACOBASE_ADMIN_API_KEY;
 
   if (!pbUrl || !adminKey) {
     return NextResponse.json({ error: "Server configuration error" }, { status: 500 });
@@ -25,7 +25,7 @@ export async function GET(
       return NextResponse.json({ error: "Proposal not found" }, { status: 404 });
     }
 
-    const proposal = result.items[0];
+    const proposal = result.items[0] as Record<string, any>;
     const businessInfo =
       typeof proposal.businessInfo === "string"
         ? JSON.parse(proposal.businessInfo)
